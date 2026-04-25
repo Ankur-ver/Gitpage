@@ -1,0 +1,66 @@
+version: '3.9'
+
+services:
+  # ── MongoDB ──────────────────────────────────────────────────
+  mongodb:
+    image: mongo:7.0
+    container_name: gitpage-mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: gitpage
+      MONGO_INITDB_ROOT_PASSWORD: gitpage_secret
+      MONGO_INITDB_DATABASE: gitpage
+    networks:
+      - gitpage-network
+
+  # ── Backend ───────────────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: gitpage-backend
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      NODE_ENV: production
+      PORT: 5000
+      MONGODB_URI: mongodb://gitpage:gitpage_secret@mongodb:27017/gitpage?authSource=admin
+      JWT_SECRET: your_super_secret_jwt_key_change_in_production
+      JWT_EXPIRES_IN: 7d
+      CLIENT_URL: http://localhost:3000
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+    depends_on:
+      - mongodb
+    volumes:
+      - repos_data:/app/repos
+    networks:
+      - gitpage-network
+
+  # ── Frontend ──────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: gitpage-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    environment:
+      VITE_API_URL: http://localhost:5000/api
+    depends_on:
+      - backend
+    networks:
+      - gitpage-network
+
+volumes:
+  mongodb_data:
+  repos_data:
+
+networks:
+  gitpage-network:
+    driver: bridge

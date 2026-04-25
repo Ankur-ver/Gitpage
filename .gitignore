@@ -1,0 +1,95 @@
+# ============================================================
+# GITPAGE - .gitignore
+# ============================================================
+
+# ---------------------------
+# 🔒 Secrets & Environment Files
+# ---------------------------
+.env
+.env.local
+.env.development
+.env.development.local
+.env.test
+.env.test.local
+.env.production
+.env.production.local
+*.pem
+*.key
+*.cert
+*.crt
+secrets/
+config/secrets.*
+
+# ---------------------------
+# 📦 Dependencies
+# ---------------------------
+node_modules/
+.pnp
+.pnp.js
+.yarn/cache
+.yarn/unplugged
+.yarn/install-state.gz
+
+# ---------------------------
+# 🏗️ Build Output
+# ---------------------------
+dist/
+build/
+out/
+.next/
+*.tsbuildinfo
+
+# ---------------------------
+# 🪵 Logs & Debug Files
+# ---------------------------
+*.log
+build.log
+build_check.log
+lint_errors.txt
+eslint_report.json
+eslint_true_errors.txt
+tsc.txt
+tsc_errors.txt
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+
+# ---------------------------
+# 🐳 Docker
+# ---------------------------
+docker-compose.override.yml
+
+# ---------------------------
+# 🛠️ TypeScript Cache
+# ---------------------------
+*.tsbuildinfo
+
+# ---------------------------
+# 🧰 Editor & IDE
+# ---------------------------
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.DS_Store
+Thumbs.db
+
+# ---------------------------
+# 🧪 Test & Coverage
+# ---------------------------
+coverage/
+.nyc_output/
+
+# ---------------------------
+# 🗂️ Misc Temp Files
+# ---------------------------
+*.tmp
+*.temp
+*.bak
+fill_components.cjs
+fill_components.js
