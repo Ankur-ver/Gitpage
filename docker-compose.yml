@@ -6,16 +6,14 @@ services:
     image: mongo:7.0
     container_name: gitpage-mongodb
     restart: unless-stopped
-    ports:
-      - "27017:27017"
+    networks:
+      - gitpage-network
     volumes:
       - mongodb_data:/data/db
     environment:
-      MONGO_INITDB_ROOT_USERNAME: gitpage
-      MONGO_INITDB_ROOT_PASSWORD: gitpage_secret
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASS}
       MONGO_INITDB_DATABASE: gitpage
-    networks:
-      - gitpage-network
 
   # ── Backend ───────────────────────────────────────────────────
   backend:
@@ -24,16 +22,15 @@ services:
       dockerfile: Dockerfile
     container_name: gitpage-backend
     restart: unless-stopped
-    ports:
-      - "5000:5000"
+    # No ports exposed to host 
     environment:
       NODE_ENV: production
       PORT: 5000
-      MONGODB_URI: mongodb://gitpage:gitpage_secret@mongodb:27017/gitpage?authSource=admin
-      JWT_SECRET: your_super_secret_jwt_key_change_in_production
+      MONGODB_URI: mongodb://${MONGO_USER}:${MONGO_PASS}@mongodb:27017/gitpage?authSource=admin
+      JWT_SECRET: ${JWT_SECRET}
       JWT_EXPIRES_IN: 7d
-      CLIENT_URL: http://localhost:3000
-      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      CLIENT_URL: https://${DOMAIN_NAME}
+      OPENAI_API_KEY: ${GROQ_API_KEY}
     depends_on:
       - mongodb
     volumes:
@@ -46,13 +43,29 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        - VITE_API_URL=/api
     container_name: gitpage-frontend
     restart: unless-stopped
-    ports:
-      - "3000:80"
-    environment:
-      VITE_API_URL: http://localhost:5000/api
     depends_on:
+      - backend
+    networks:
+      - gitpage-network
+
+  # ── Nginx (The Front Door) ────────────────────────────────────
+  nginx:
+    image: nginx:alpine
+    container_name: gitpage-nginx
+    restart: always
+    ports:
+      - "80:80"      # Standard Web
+      - "443:443"    # Secure Web (SSL)
+    volumes:
+      - ./nginx/conf:/etc/nginx/conf.d
+      - ./certbot/conf:/etc/letsencrypt
+      - ./certbot/www:/var/www/certbot
+    depends_on:
+      - frontend
       - backend
     networks:
       - gitpage-network
@@ -60,6 +73,8 @@ services:
 volumes:
   mongodb_data:
   repos_data:
+  certbot_conf: # Fixed name
+  certbot_www:  # Fixed name
 
 networks:
   gitpage-network:
