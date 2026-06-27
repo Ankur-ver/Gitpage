@@ -50,10 +50,10 @@ const Navbar: React.FC = () => {
   ];
 
   const userMenuItems = [
-    { label: 'Your profile',      path: `/profile/${user?.username}`                  },
+    { label: 'Your profile',      path: `/profile/${user?.username}`         },
     { label: 'Your repositories', path: `/repositories` },
-    { label: 'Your projects',     path: '/projects'                           },
-    { label: 'Your stars',        path: `/${user?.username}?tab=stars`        },
+    { label: 'Your projects',     path: `/profile/${user?.username}?tab=projects` },
+    { label: 'Your stars',        path: `/profile/${user?.username}?tab=stars`    },
     { label: 'AI Dashboard',      path: '/ai-dashboard'                       },
     { label: 'Settings',          path: '/settings'                           },
   ];

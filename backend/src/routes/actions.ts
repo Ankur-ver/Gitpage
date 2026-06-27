@@ -1,6 +1,6 @@
 import { Router, Response } from 'express';
 import { protect, AuthRequest } from '../middleware/auth';
-import WorkflowRun  from '../models/Workflowrun';
+import WorkflowRun  from '../models/WorkflowRun';
 import Workflow     from '../models/Workflow';
 import Repository       from '../models/Repository';
 

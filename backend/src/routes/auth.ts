@@ -11,6 +11,9 @@ const router = Router();
 // ✅ removed local JWT_SECRET — config/jwt.ts owns it exclusively
 const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:5173';
 const API_URL    = process.env.API_URL    || 'http://localhost:5000';
+const GOOGLE_TOKEN_URL = process.env.GOOGLE_TOKEN_URL || 'https://oauth2.googleapis.com/token';
+const GOOGLE_USERINFO_URL = process.env.GOOGLE_USERINFO_URL || 'https://www.googleapis.com/oauth2/v3/userinfo';
+const GOOGLE_REQUEST_TIMEOUT_MS = Number(process.env.GOOGLE_REQUEST_TIMEOUT_MS || 15000);
 
 /* ── Helpers ─────────────────────────────────────────────────────── */
 const safeUser = (user: any) => {
@@ -27,18 +30,29 @@ async function upsertOAuthUser(profile: {
   displayName: string;
   avatarUrl  : string;
 }) {
-  const { provider, providerId, email, username, displayName, avatarUrl } = profile;
+  const { provider, providerId, username, displayName, avatarUrl } = profile;
+  const email = profile.email.trim().toLowerCase();
+  if (!email) throw new Error(`${provider} profile did not include an email address`);
 
   /* 1 — existing OAuth link */
   let user = await User.findOne({ [`oauth.${provider}.id`]: providerId });
-  if (user) return user;
+  if (user) {
+    if (user.email !== email) {
+      const emailOwner = await User.findOne({ email, _id: { $ne: user._id } });
+      if (!emailOwner) user.email = email;
+    }
+    user.displayName = displayName || user.displayName || username;
+    user.avatarUrl   = avatarUrl || user.avatarUrl;
+    await user.save();
+    return user;
+  }
 
   /* 2 — same email → link provider to existing account */
   user = await User.findOne({ email });
   if (user) {
     user.set(`oauth.${provider}`, { id: providerId });
-    if (!user.avatarUrl)    user.avatarUrl    = avatarUrl;
-    if (!user.displayName)  user.displayName  = displayName;
+    user.avatarUrl   = avatarUrl || user.avatarUrl;
+    user.displayName = displayName || user.displayName || username;
     await user.save();
     return user;
   }
@@ -51,8 +65,8 @@ async function upsertOAuthUser(profile: {
   user = await User.create({
     username   : safeUsername,
     email,
-    displayName,
-    avatarUrl,
+    displayName: displayName || safeUsername,
+    avatarUrl  : avatarUrl || '',
     password   : `oauth_${Math.random().toString(36).slice(2)}${Date.now()}`,
     oauth      : { [provider]: { id: providerId } },
   });
@@ -227,7 +241,7 @@ router.get('/google/callback', async (req: Request, res: Response) => {
 
   try {
     const tokenRes = await axios.post<{ access_token?: string; error?: string }>(
-      'https://oauth2.googleapis.com/token',
+      GOOGLE_TOKEN_URL,
       new URLSearchParams({
         code,
         client_id    : process.env.GOOGLE_CLIENT_ID!,
@@ -235,7 +249,10 @@ router.get('/google/callback', async (req: Request, res: Response) => {
         redirect_uri : `${API_URL}/api/auth/google/callback`,
         grant_type   : 'authorization_code',
       }).toString(),
-      { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+      {
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        timeout: GOOGLE_REQUEST_TIMEOUT_MS,
+      }
     );
 
     const accessToken = tokenRes.data.access_token;
@@ -250,8 +267,11 @@ router.get('/google/callback', async (req: Request, res: Response) => {
       name   : string;
       picture: string;
     }>(
-      'https://www.googleapis.com/oauth2/v3/userinfo',
-      { headers: { Authorization: `Bearer ${accessToken}` } }
+      GOOGLE_USERINFO_URL,
+      {
+        headers: { Authorization: `Bearer ${accessToken}` },
+        timeout: GOOGLE_REQUEST_TIMEOUT_MS,
+      }
     );
 
     const gUser       = profileRes.data;
@@ -274,7 +294,9 @@ router.get('/google/callback', async (req: Request, res: Response) => {
       `${CLIENT_URL}/oauth/callback?token=${encodeURIComponent(token)}&provider=google`
     );
   } catch (err: any) {
-    console.error('[Google OAuth] callback error:', err.message);
+    const status = err.response?.status ? ` status=${err.response.status}` : '';
+    const code = err.code ? ` code=${err.code}` : '';
+    console.error(`[Google OAuth] callback error:${status}${code}`, err.message);
     res.redirect(`${CLIENT_URL}/oauth/callback?error=google_failed`);
   }
 });

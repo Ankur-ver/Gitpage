@@ -572,6 +572,7 @@ export interface FileContentData {
   content : string;
   encoding: string;
   size    : number;
+  sha    ?: string;
 }
 
 export interface UseFileContentReturn extends AsyncState<FileContentData> {

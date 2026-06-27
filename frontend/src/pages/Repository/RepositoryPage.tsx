@@ -468,6 +468,7 @@ const RepositoryPage: React.FC = () => {
     data    : fileContent,
     loading : fileContentLoading,
     error   : fileContentError,
+    refetch : refetchFileContent,
   } = useFileContent(
     username,
     repoName,
@@ -544,6 +545,12 @@ const { fork: forkRepo, loading: forkLoading, error: forkError, forkCount } =
     setSelectedFile(null);
     setCodeView('files');
   }, []);
+
+  const handleFileCommitted = useCallback(() => {
+    refetchFileContent();
+    refetchCommits();
+    refetchRepo();
+  }, [refetchCommits, refetchFileContent, refetchRepo]);
 
   type RepositoryTabConfigWithRender = RepositoryTabConfig & {
     render: () => React.ReactNode;
@@ -800,6 +807,12 @@ npm run dev`}
                   code={fileContent?.content ?? ''}
                   language={selectedFile ? detectLanguage(selectedFile.name) : repo.language ?? 'text'}
                   filename={selectedFile?.name ?? repo.name}
+                  owner={username}
+                  repo={repoName}
+                  branch={activeBranch}
+                  filePath={selectedFile?.path}
+                  fileSha={fileContent?.sha}
+                  onCommitted={handleFileCommitted}
                 />
               )}
             </div>
@@ -1015,7 +1028,7 @@ npm run dev`}
     activeBranch, branchLoading, branchNames, codeView, commits, commitsError,
     commitsLoading, commitPagination, currentPath, fileContent, fileContentError,
     fileContentLoading, files, filesError, filesLoading, forkCount, handleBackToFiles,
-    handleBranchChange, handleFileOpen, handlePathChange, latestCommit, refetchCommits,
+    handleBranchChange, handleFileCommitted, handleFileOpen, handlePathChange, latestCommit, refetchCommits,
     repository, repoName, setCodeView, setSelectedFile, showCloneBox, starCount,
     watcherCount, stats, statsLoading, username,
   ]);

@@ -137,6 +137,45 @@ export const repositoryService = {
     }
   },
 
+  // ───────────────────────────────────────────────────────────────────────────
+  // Pull requests
+  // ───────────────────────────────────────────────────────────────────────────
+
+  async getPullRequests(owner: string, repo: string, state: string = 'open') {
+    try {
+      const { data } = await api.get<any>(`/pulls/${owner}/${repo}/pulls`, { params: { state } });
+      return data as any[];
+    } catch (err) {
+      throw new Error(extractError(err));
+    }
+  },
+
+  async mergePullRequest(owner: string, repo: string, number: number) {
+    try {
+      const { data } = await api.put(`/pulls/${owner}/${repo}/pulls/${number}/merge`);
+      return data;
+    } catch (err) {
+      throw new Error(extractError(err));
+    }
+  },
+
+  async getPullRequest(owner: string, repo: string, number: number) {
+    try {
+      const { data } = await api.get(`/pulls/${owner}/${repo}/pulls/${number}`);
+      return data;
+    } catch (err) {
+      throw new Error(extractError(err));
+    }
+  },
+  async createPullRequest(owner: string, repo: string, form: { title: string; body?: string; head: string; base: string; draft?: boolean }) {
+    try {
+      const { data } = await api.post(`/pulls/${owner}/${repo}/pulls`, form);
+      return data;
+    } catch (err) {
+      throw new Error(extractError(err));
+    }
+  },
+
   /**
    * Fetch a single repository by owner username + repo name
    * GET /repositories/:username/:repoName
@@ -401,10 +440,10 @@ export const repositoryService = {
     repoName: string,
     branch  : string,
     filePath: string
-  ): Promise<{ content: string; encoding: string; size: number }> {
+  ): Promise<{ content: string; encoding: string; size: number; sha?: string }> {
     try {
       const { data } = await api.get<
-        ApiResponse<{ content: string; encoding: string; size: number }>
+        ApiResponse<{ content: string; encoding: string; size: number; sha?: string }>
       >(
         `/repositories/${username}/${repoName}/contents`,
         { params: { branch, path: filePath } }
@@ -423,6 +462,34 @@ export const repositoryService = {
    * Check if the current authenticated user has starred the repo
    * GET /repositories/:username/:repoName/star
    */
+  async updateFileContent(
+    username: string,
+    repoName: string,
+    branch  : string,
+    filePath: string,
+    content : string,
+    message : string,
+    expectedSha?: string
+  ): Promise<{
+    branch: string;
+    path  : string;
+    commit: { sha: string; shortSha: string; message: string };
+  }> {
+    try {
+      const { data } = await api.put<ApiResponse<{
+        branch: string;
+        path  : string;
+        commit: { sha: string; shortSha: string; message: string };
+      }>>(
+        `/repositories/${username}/${repoName}/contents`,
+        { branch, path: filePath, content, message, expectedSha }
+      );
+      return data.data;
+    } catch (err) {
+      throw new Error(extractError(err));
+    }
+  },
+
   async checkStarred(
     username: string,
     repoName: string

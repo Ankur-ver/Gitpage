@@ -67,6 +67,7 @@ export interface User {
   id          : ObjectIdString;
   username    : string;
   email       : string;
+  displayName?: string;
   avatarUrl  ?: string;
   bio        ?: string;
   location   ?: string;
@@ -77,6 +78,10 @@ export interface User {
   publicRepos : number;
   createdAt   : ISODateString;
   plan        : UserPlan;
+  oauth       ?: {
+    github?: { id: string };
+    google?: { id: string };
+  };
 }
 
 /**
@@ -343,6 +348,8 @@ export interface PullRequest {
   mergedAt   ?: ISODateString;
   mergedBy   ?: UserSummary;
   closedAt   ?: ISODateString;
+  // UI helper — set by backend when listing PRs if the current user can merge
+  canMerge?   : boolean;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

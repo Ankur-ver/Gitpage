@@ -24,10 +24,18 @@ export interface IUser extends Document {
   comparePassword(candidate: string): Promise<boolean>;
 }
 
+const OAuthProviderSchema = new Schema(
+  {
+    id: { type: String, required: true },
+  },
+  { _id: false }
+);
+
 const UserSchema = new Schema<IUser>({
   username:   { type: String, required: true, unique: true, trim: true, minlength: 3, maxlength: 39 },
   email:      { type: String, required: true, unique: true, trim: true, lowercase: true },
   password:   { type: String, required: true, minlength: 8 },
+  displayName:{ type: String, trim: true, default: '' },
   avatarUrl:  { type: String, default: '' },
   bio:        { type: String, maxlength: 160, default: '' },
   location:   { type: String, default: '' },
@@ -38,15 +46,16 @@ const UserSchema = new Schema<IUser>({
   publicRepos:{ type: Number, default: 0 },
   plan:       { type: String, enum: ['free','pro','enterprise'], default: 'free' },
   aiEnabled:  { type: Boolean, default: true },
+  oauth: {
+    github: { type: OAuthProviderSchema, default: undefined },
+    google: { type: OAuthProviderSchema, default: undefined },
+  },
 }, { timestamps: true });
 
 UserSchema.pre('save', async function(next) {
   if (!this.isModified('password')) return next();
-  if(this.password.startsWith('oauth_') && this.password.length>20){
   this.password = await bcrypt.hash(this.password, 12);
   next();
-  }
-  this.password = await bcrypt.hash(this.password, 12);
 });
 
 UserSchema.methods.comparePassword = function(candidate: string): Promise<boolean> {

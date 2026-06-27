@@ -1,5 +1,7 @@
 import { Router, Request, Response } from 'express';
 import path       from 'path';
+import os         from 'os';
+import fs         from 'fs/promises';
 import simpleGit  from 'simple-git';
 import mongoose   from 'mongoose';
 import Repository from '../models/Repository';
@@ -27,6 +29,21 @@ async function findRepo(ownerUsername: string, repoName: string) {
   });
 }
 
+function normalizeRepoFilePath(filePath: string): string {
+  const normalized = path.posix.normalize(filePath.replace(/\\/g, '/')).replace(/^\/+/, '');
+  if (!normalized || normalized === '.' || normalized.startsWith('../') || normalized.includes('/../')) {
+    throw new Error('Invalid file path');
+  }
+  return normalized;
+}
+
+function canWriteRepo(repo: any, userId: mongoose.Types.ObjectId): boolean {
+  if (repo.owner?.equals?.(userId)) return true;
+  return repo.collaborators?.some((collab: any) =>
+    collab.user?.equals?.(userId) && ['write', 'admin'].includes(collab.role)
+  );
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // @route   GET /api/repositories/:username/:repoName/branches
 // ─────────────────────────────────────────────────────────────────────────────
@@ -37,7 +54,7 @@ router.get(
       const { username, repoName } = req.params;
 
       const repo = await Repository.findOne({
-        ownerUsername: username,
+        ownerUsername: username.toLowerCase(),
         name:          repoName,
       });
       if (!repo) return res.status(404).json({ success: false, error: 'Not found' });
@@ -154,6 +171,7 @@ router.get(
 
       const { git } = getGit(username, repoName);
       const content  = await git.show([`${branch}:${filePath}`]);
+      const sha      = (await git.raw(['rev-parse', `${branch}:${filePath}`])).trim();
 
       return res.json({
         success: true,
@@ -161,6 +179,7 @@ router.get(
           content,
           encoding: 'utf-8',
           size    : Buffer.byteLength(content, 'utf-8'),
+          sha,
         },
       });
     } catch (err) {
@@ -173,6 +192,117 @@ router.get(
 );
 
 // ─────────────────────────────────────────────────────────────────────────────
+router.put(
+  '/:username/:repoName/contents',
+  protect,
+  async (req: AuthRequest, res: Response) => {
+    let tempDir = '';
+
+    try {
+      const { username, repoName } = req.params;
+      const {
+        branch = 'main',
+        path: requestPath,
+        content,
+        message,
+        expectedSha,
+      } = req.body as {
+        branch?: string;
+        path?: string;
+        content?: string;
+        message?: string;
+        expectedSha?: string;
+      };
+
+      if (!requestPath) {
+        return res.status(400).json({ success: false, error: 'File path required' });
+      }
+      if (typeof content !== 'string') {
+        return res.status(400).json({ success: false, error: 'File content required' });
+      }
+      if (Buffer.byteLength(content, 'utf-8') > 5 * 1024 * 1024) {
+        return res.status(413).json({ success: false, error: 'File is too large to edit online' });
+      }
+
+      const filePath = normalizeRepoFilePath(requestPath);
+      const commitMessage = (message || `Update ${filePath}`).trim();
+      if (!commitMessage) {
+        return res.status(400).json({ success: false, error: 'Commit message required' });
+      }
+
+      const repo = await findRepo(username, repoName);
+      if (!repo) return res.status(404).json({ success: false, error: 'Repository not found' });
+
+      const userId = new mongoose.Types.ObjectId(req.user!._id);
+      if (!canWriteRepo(repo, userId)) {
+        return res.status(403).json({ success: false, error: 'You do not have write access to this repository' });
+      }
+
+      const { git, repoPath } = getGit(username, repoName);
+      const targetBranch = branch || repo.defaultBranch || 'main';
+
+      await git.raw(['rev-parse', '--verify', targetBranch]);
+      const currentSha = (await git.raw(['rev-parse', `${targetBranch}:${filePath}`])).trim();
+      if (expectedSha && expectedSha !== currentSha) {
+        return res.status(409).json({
+          success: false,
+          error  : 'This file changed since you opened it. Refresh before committing.',
+          data   : { currentSha },
+        });
+      }
+
+      tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'gitpage-edit-'));
+      await simpleGit().clone(repoPath, tempDir, ['--branch', targetBranch, '--single-branch']);
+
+      const workGit = simpleGit(tempDir);
+      const authorName = req.user!.displayName || req.user!.username || 'GitPage User';
+      const authorEmail = req.user!.email || 'noreply@gitpage.com';
+
+      await workGit.addConfig('user.name', authorName);
+      await workGit.addConfig('user.email', authorEmail);
+
+      const absoluteFilePath = path.join(tempDir, ...filePath.split('/'));
+      await fs.mkdir(path.dirname(absoluteFilePath), { recursive: true });
+      await fs.writeFile(absoluteFilePath, content, 'utf-8');
+
+      await workGit.add(filePath);
+      const status = await workGit.status();
+      if (!status.files.some(file => file.path.replace(/\\/g, '/') === filePath)) {
+        return res.status(400).json({ success: false, error: 'No changes to commit' });
+      }
+
+      const commit = await workGit.commit(commitMessage, [filePath]);
+      await workGit.push('origin', targetBranch);
+
+      repo.updatedAt = new Date();
+      await repo.save();
+
+      return res.json({
+        success: true,
+        data   : {
+          branch: targetBranch,
+          path  : filePath,
+          commit: {
+            sha     : commit.commit,
+            shortSha: commit.commit.slice(0, 7),
+            message : commitMessage,
+          },
+        },
+      });
+    } catch (err) {
+      console.error('[edit-file]', err);
+      return res.status(500).json({
+        success: false,
+        error  : (err as Error).message || 'Failed to commit file',
+      });
+    } finally {
+      if (tempDir) {
+        await fs.rm(tempDir, { recursive: true, force: true }).catch(() => {});
+      }
+    }
+  }
+);
+
 // @route   GET /api/repositories/:username/:repoName/commits
 // @desc    Get ALL paginated commits — fixed parser
 // ─────────────────────────────────────────────────────────────────────────────
@@ -341,7 +471,7 @@ router.get(
       const { username, repoName } = req.params;
 
       const repo = await Repository.findOne({
-        ownerUsername: username,
+        ownerUsername: username.toLowerCase(),
         name:          repoName,
       });
       if (!repo) return res.status(404).json({ success: false, error: 'Not found' });
@@ -576,6 +706,17 @@ router.post(
 
       const forkerUsername: string = forkingUser.username;
 
+      const repoBasePath = process.env.REPO_STORAGE_PATH || process.env.REPOS_DIR;
+      if (!repoBasePath) {
+        return res.status(500).json({ message: 'Repository storage path is not configured' });
+      }
+
+      const repoPath = path.resolve(repoBasePath, forkerUsername, `${forkName}.git`);
+      await fs.mkdir(path.dirname(repoPath), { recursive: true });
+
+      const sourceRepoPath = getGit(source.ownerUsername, source.name).repoPath;
+      await simpleGit().clone(sourceRepoPath, repoPath, ['--bare']);
+
       const forked = await Repository.create({
         name:          forkName,
         fullName:      `${forkerUsername}/${forkName}`,
@@ -588,7 +729,7 @@ router.post(
         visibility:    source.visibility,
         archived:      false,
         disabled:      false,
-        status:        'creating',
+        status:        'ready',
         fork:          true,
         forkedFrom:    source._id,
         stars:         [],
@@ -601,22 +742,18 @@ router.post(
         openIssues:    0,
         license:       source.license,
         homepage:      source.homepage,
-        gitPath:       `repos/${forkerUsername}/${forkName}.git`,
+        gitPath:       repoPath,
         cloneUrls: {
           http: `${process.env.APP_URL ?? 'http://localhost:5000'}/${forkerUsername}/${forkName}.git`,
           ssh:  `git@${process.env.APP_DOMAIN ?? 'localhost'}:${forkerUsername}/${forkName}.git`,
         },
-        isInitialized: false,
+        isInitialized: true,
         initOptions:   source.initOptions,
         collaborators: [],
       });
 
       source.forks.push(forked._id);
       await source.save();
-
-      forked.status        = 'ready';
-      forked.isInitialized = true;
-      await forked.save();
 
       res.status(201).json(forked);
     } catch (err: any) {

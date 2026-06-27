@@ -6,6 +6,7 @@ import compression  from 'compression';
 import { createServer } from 'http';
 import { Server }   from 'socket.io';
 import dotenv       from 'dotenv';
+import dns          from 'dns';
 import { connectDB } from './src/config/database';
 import authRoutes   from './src/routes/auth';
 import repoRoutes   from './src/routes/repos';
@@ -22,6 +23,15 @@ import { errorHandler } from './src/middleware/errorHandler';
 import rateLimit    from 'express-rate-limit';
 import projectRoutes from './src/routes/projectRoutes'
 dotenv.config();
+
+const dnsServers = process.env.DNS_SERVERS || process.env.GOOGLE_OAUTH_DNS_SERVERS;
+if (dnsServers) {
+  const servers = dnsServers.split(',').map(server => server.trim()).filter(Boolean);
+  if (servers.length) {
+    dns.setServers(servers);
+    console.log(`[network] DNS servers: ${servers.join(', ')}`);
+  }
+}
 
 const app        = express();
 const httpServer = createServer(app);

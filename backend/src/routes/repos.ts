@@ -422,10 +422,11 @@ router.get(
       const { username, repoName } = req.params;
 
       const repository = (await Repository.findOne({
-        ownerUsername: username,
+        ownerUsername: username.toLowerCase(),
         name: repoName,
       })
         .populate("owner", "username avatar bio")
+        .populate({ path: 'forkedFrom', select: 'name ownerUsername' })
         .select("-gitPath")
         .lean()
         .exec()) as unknown as IRepository | null;
@@ -519,7 +520,7 @@ router.delete(
       };
 
       const repository = await Repository.findOne({
-        ownerUsername: username,
+        ownerUsername: username.toLowerCase(),
         name: repoName,
       });
 

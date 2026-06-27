@@ -22,6 +22,8 @@ services:
       dockerfile: Dockerfile
     container_name: gitpage-backend
     restart: unless-stopped
+    env_file:
+      - ./backend/.env
     # No ports exposed to host 
     environment:
       NODE_ENV: production
@@ -30,7 +32,13 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       JWT_EXPIRES_IN: 7d
       CLIENT_URL: https://${DOMAIN_NAME}
+      API_URL: https://${DOMAIN_NAME}
+      GOOGLE_OAUTH_DNS_SERVERS: ${GOOGLE_OAUTH_DNS_SERVERS:-8.8.8.8,1.1.1.1}
+      GOOGLE_REQUEST_TIMEOUT_MS: ${GOOGLE_REQUEST_TIMEOUT_MS:-15000}
       OPENAI_API_KEY: ${GROQ_API_KEY}
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
     depends_on:
       - mongodb
     volumes:

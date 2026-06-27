@@ -119,7 +119,7 @@ const checkAccess = async (
     const Repository = (await import('../models/Repository')).default;
 
     const repo = await Repository.findOne({
-      ownerUsername: username,
+      ownerUsername: username.toLowerCase(),
       name         : repoName,
     });
 
@@ -220,7 +220,7 @@ const updateRepoAfterPush = async (
     const size = getDirSize(repoPath);
 
     await Repository.findOneAndUpdate(
-      { ownerUsername: username, name: repoName },
+      { ownerUsername: username.toLowerCase(), name: repoName },
       { isInitialized: true, status: 'ready', size, updatedAt: new Date() }
     );
 

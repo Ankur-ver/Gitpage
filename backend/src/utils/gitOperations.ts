@@ -256,3 +256,111 @@ export const repositoryExistsOnDisk = async (
 ): Promise<boolean> => {
   return fs.pathExists(repoPath);
 };
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Merge branches: merges headBranch from forkRepoPath into baseBranch in upstreamRepoPath
+// ─────────────────────────────────────────────────────────────────────────────
+export const mergeBranches = async (
+  upstreamRepoPath: string,
+  forkRepoPath: string,
+  baseBranch: string,
+  headBranch: string
+): Promise<GitOperationResult> => {
+  const tempDir = path.join(os.tmpdir(), `gitpage-merge-${Date.now()}`);
+
+  try {
+    await fs.ensureDir(tempDir);
+
+    // Clone upstream repository
+    const git = simpleGit();
+    await git.clone(upstreamRepoPath, tempDir);
+
+    const repoGit = simpleGit(tempDir);
+
+    // Configure merge author
+    await repoGit.addConfig("user.name", "GitPage");
+    await repoGit.addConfig("user.email", "noreply@gitpage.com");
+
+    console.log("Upstream:", upstreamRepoPath);
+    console.log("Fork:", forkRepoPath);
+    console.log("Base branch:", baseBranch);
+    console.log("Head branch:", headBranch);
+
+    // Remove existing fork remote if present
+    try {
+      await repoGit.removeRemote("fork");
+    } catch {}
+
+    // Add fork remote
+    await repoGit.addRemote("fork", forkRepoPath);
+
+    // Fetch all refs
+    await repoGit.fetch("origin");
+    await repoGit.fetch([
+    "fork",
+    `${headBranch}:refs/remotes/fork/${headBranch}`,
+    ]);
+
+    const allBranches = await repoGit.branch(["-a"]);
+    console.log("Available branches:", allBranches.all);
+
+    // Ensure local base branch exists
+    try {
+      await repoGit.checkout(baseBranch);
+    } catch {
+      console.log(
+        `Creating local branch ${baseBranch} from origin/${baseBranch}`
+      );
+
+      await repoGit.checkout([
+        "-b",
+        baseBranch,
+        `origin/${baseBranch}`,
+      ]);
+    }
+
+    const currentBranch = await repoGit.branch();
+    console.log("Current branch:", currentBranch.current);
+
+    // Verify fork branch exists
+await repoGit.fetch("fork", headBranch);
+
+const forkCommit = (
+  await repoGit.raw([
+    "rev-parse",
+    "FETCH_HEAD",
+  ])
+).trim();
+
+console.log("Fork commit:", forkCommit);
+
+await repoGit.merge([forkCommit]);
+
+    console.log("Merge successful");
+
+    // Push merged result
+    try {
+      await repoGit.push("origin", baseBranch);
+    } catch (err: any) {
+      console.error("GIT PUSH ERROR:", err);
+
+      throw new Error(
+        `Push failed: ${err.message}`
+      );
+    }
+
+    await fs.remove(tempDir);
+
+    return {
+      success: true,
+    };
+  } catch (err: any) {
+    console.error("MERGE ERROR:", err);
+
+    await fs.remove(tempDir).catch(() => {});
+
+    throw new Error(
+      `Merge operation failed: ${err.message}`
+    );
+  }
+};

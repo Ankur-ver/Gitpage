@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import {
   StarIcon,
   CodeBracketIcon,
@@ -98,6 +98,13 @@ interface AIInsightsData {
 }
 
 type SortKey = 'updated' | 'name' | 'stars' | 'forks' | 'created';
+
+const dashboardTabs: Tab[] = ['overview', 'repositories', 'projects', 'packages', 'stars'];
+
+const getTabFromSearch = (searchParams: URLSearchParams): Tab => {
+  const requestedTab = searchParams.get('tab');
+  return dashboardTabs.includes(requestedTab as Tab) ? requestedTab as Tab : 'overview';
+};
 
 // =============================================================================
 // Helpers
@@ -276,8 +283,9 @@ const EmptyState: React.FC<{
 const Dashboard: React.FC = () => {
   const { user } = useSelector((s: RootState) => s.auth);
   const username = user?.username ?? '';
+  const [searchParams, setSearchParams] = useSearchParams();
 
-  const [tab, setTab] = useState<Tab>('overview');
+  const [tab, setTab] = useState<Tab>(() => getTabFromSearch(searchParams));
   const [contributionCount, setContributionCount] = useState<number | null>(null);
 
   // ── repos ──────────────────────────────────────────────────────────────────
@@ -411,6 +419,11 @@ const Dashboard: React.FC = () => {
   // ==========================================================================
   // Effects
   // ==========================================================================
+
+  useEffect(() => {
+    const requestedTab = getTabFromSearch(searchParams);
+    setTab(requestedTab);
+  }, [searchParams]);
 
   // Initial load
   useEffect(() => {
@@ -1242,7 +1255,10 @@ const Dashboard: React.FC = () => {
             {tabDefs.map((t) => (
               <button
                 key={t.id}
-                onClick={() => setTab(t.id)}
+                onClick={() => {
+                  setTab(t.id);
+                  setSearchParams(t.id === 'overview' ? {} : { tab: t.id });
+                }}
                 className={`flex items-center gap-2 px-4 py-2.5 text-sm capitalize whitespace-nowrap border-b-2 transition-all ${tab === t.id
                     ? 'border-indigo-500 text-text-primary'
                     : 'border-transparent text-text-secondary hover:text-text-primary'
