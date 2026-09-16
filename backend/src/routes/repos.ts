@@ -9,9 +9,14 @@ import { protect } from "../middleware/auth";
 import {
   createBareRepository,
   initializeRepositoryWithFiles,
-  deleteRepositoryFromDisk,
-  repositoryExistsOnDisk,
 } from "../utils/gitOperations";
+import {
+  deleteRepository,
+  persistNamedRepository,
+  repositoryObjectKey,
+  repositoryStoragePath,
+  repositoryExists,
+} from "../services/repositoryStorage";
 import {
   AuthenticatedRequest,
   CreateRepositoryBody,
@@ -99,6 +104,7 @@ router.post(
     session.startTransaction();
 
     let repoPath: string | null = null;
+    let repoKey: string | null = null;
     let repoCreatedOnDisk = false;
 
     try {
@@ -148,22 +154,10 @@ router.post(
       }
 
       // ── Step 4: Build storage path ─────────────────────────────────────────
-      const repoBasePath =
-        process.env.REPO_STORAGE_PATH || process.env.REPOS_DIR;
+      repoKey = repositoryObjectKey(owner.username, name.trim());
+      repoPath = repositoryStoragePath(owner.username, name.trim());
 
-      if (!repoBasePath) {
-        await abortAndEndSession(session);
-        res.status(500).json({
-          success: false,
-          error: "Repository storage path is not configured.",
-        });
-        return;
-      }
-
-      repoPath = path.resolve(repoBasePath, owner.username, `${name}.git`);
-
-      const existsOnDisk = await repositoryExistsOnDisk(repoPath);
-      if (existsOnDisk) {
+      if (await repositoryExists(repoKey)) {
         await abortAndEndSession(session);
         res.status(409).json({
           success: false,
@@ -188,7 +182,7 @@ router.post(
           gitignoreTemplate: gitignoreTemplate ?? "",
           licenseTemplate: licenseTemplate ?? "",
         },
-        gitPath: repoPath,
+        gitPath: repoKey,
         cloneUrls: {
           http: `http://localhost:${process.env.PORT}/${owner.username}/${name}.git`,
           ssh: `git@gitpage.com:${owner.username}/${name}.git`,
@@ -226,6 +220,8 @@ router.post(
           }
         );
       }
+
+      await persistNamedRepository(owner.username, name.trim(), repoPath);
 
       // ── Step 9: Mark repository as ready ───────────────────────────────────
       repository.isInitialized = shouldInitialize;
@@ -266,7 +262,7 @@ router.post(
 
       // ── Cleanup disk if repo was created ──────────────────────────────────
       if (repoCreatedOnDisk && repoPath) {
-        await deleteRepositoryFromDisk(repoPath).catch((cleanupErr: Error) => {
+        if (repoKey) await deleteRepository(repoKey).catch((cleanupErr: Error) => {
           console.error("Cleanup error:", cleanupErr.message);
         });
       }
@@ -556,7 +552,7 @@ router.delete(
       );
 
       // ── Delete from disk ────────────────────────────────────────────────────
-      await deleteRepositoryFromDisk(repoPath);
+      await deleteRepository(repoPath);
 
       await session.commitTransaction();
       session.endSession();

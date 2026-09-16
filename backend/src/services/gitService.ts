@@ -1,6 +1,7 @@
 import { execSync } from 'child_process';
 import path from 'path';
 import fs   from 'fs';
+import { prepareRepository } from './repositoryStorage';
 
 const REPOS_DIR = process.env.REPOS_DIR || path.resolve(process.cwd(), 'repos');
 
@@ -58,8 +59,8 @@ const gitService = {
   },
 
   /* ── Count commits ───────────────────────────────────────────────── */
-  getCommitCount(owner: string, repoName: string) {
-    const repoPath = path.join(REPOS_DIR, owner, `${repoName}.git`);
+  async getCommitCount(owner: string, repoName: string) {
+    const repoPath = await prepareRepository(owner, repoName);
     try {
       const output = execSync('git rev-list --all --count', { cwd: repoPath }).toString().trim();
       return Number(output) || 0;
@@ -69,9 +70,13 @@ const gitService = {
   },
 
   /* ── Repo exists? ──────────────────────────────────────────── */
-  repoExists(owner: string, repoName: string): boolean {
-    const repoPath = path.join(REPOS_DIR, owner, `${repoName}.git`);
-    return fs.existsSync(repoPath);
+  async repoExists(owner: string, repoName: string): Promise<boolean> {
+    try {
+      await prepareRepository(owner, repoName);
+      return true;
+    } catch {
+      return false;
+    }
   },
 
   /* ── Delete repo ───────────────────────────────────────────── */

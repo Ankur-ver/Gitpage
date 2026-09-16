@@ -4,6 +4,11 @@ import fs                            from 'fs';
 import { spawn }                     from 'child_process';
 import jwt                           from 'jsonwebtoken';
 import dotenv                        from 'dotenv';
+import {
+  prepareRepository,
+  persistNamedRepository,
+  repositoryExists,
+} from '../services/repositoryStorage';
 
 dotenv.config();
 
@@ -36,13 +41,6 @@ const extractRepoInfo = (
     return null;
   }
   return { username: match[1], repoName: match[2] };
-};
-
-/** Resolve full path to bare repo on disk */
-const getRepoPath = (username: string, repoName: string): string => {
-  const storagePath = process.env.REPO_STORAGE_PATH || '/data/gitpage/repos';
-  console.log(storagePath)
-  return path.join(storagePath, username, `${repoName}.git`);
 };
 
 /** Parse Basic Auth header → { username, password } */
@@ -91,7 +89,9 @@ const resolveUser = async (req: Request): Promise<any | null> => {
 
       // 2) Real username + password — look up user in DB and compare with bcrypt
       const bcrypt = await import('bcryptjs');
-      const user   = await User.findOne({ username: creds.username });
+      const user   = await User.findOne({
+        username: { $regex: `^${creds.username.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' },
+      });
       if (!user) return null;
 
       const match = await bcrypt.compare(creds.password, user.password);
@@ -119,7 +119,7 @@ const checkAccess = async (
     const Repository = (await import('../models/Repository')).default;
 
     const repo = await Repository.findOne({
-      ownerUsername: username.toLowerCase(),
+      ownerUsername: { $regex: `^${username.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' },
       name         : repoName,
     });
 
@@ -220,7 +220,10 @@ const updateRepoAfterPush = async (
     const size = getDirSize(repoPath);
 
     await Repository.findOneAndUpdate(
-      { ownerUsername: username.toLowerCase(), name: repoName },
+      {
+        ownerUsername: { $regex: `^${username.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' },
+        name: repoName,
+      },
       { isInitialized: true, status: 'ready', size, updatedAt: new Date() }
     );
 
@@ -283,6 +286,10 @@ router.all('*', async (req: Request, res: Response): Promise<void> => {
   );
 
   if (!allowed) {
+    if (reason === 'Repository not found') {
+      res.status(404).end(reason);
+      return;
+    }
     if (!user) {
       res.setHeader('WWW-Authenticate', 'Basic realm="GitPage"');
       res.status(401).end(reason ?? 'Authentication required');
@@ -293,13 +300,13 @@ router.all('*', async (req: Request, res: Response): Promise<void> => {
   }
 
   // ── Verify repo exists on disk ─────────────────────────────────────────────
-  const repoPath = getRepoPath(username, repoName);
-  console.log(`[GIT] repoPath=${repoPath} exists=${fs.existsSync(repoPath)}`);
-
-  if (!fs.existsSync(repoPath)) {
-    res.status(404).end('Repository not found on disk');
+  const objectKey = `repositories/${username.toLowerCase()}/${repoName}.git.tar.gz`;
+  if (!await repositoryExists(objectKey)) {
+    res.status(404).end('Repository not found');
     return;
   }
+  const repoPath = await prepareRepository(username, repoName);
+  console.log(`[GIT] repoPath=${repoPath}`);
 
   // ═══════════════════════════════════════════════════════════════════════════
   // CASE 1: info/refs — git discovery
@@ -362,6 +369,7 @@ router.all('*', async (req: Request, res: Response): Promise<void> => {
       async (code) => {
         if (code === 0) {
           await updateRepoAfterPush(username, repoName, repoPath);
+          await persistNamedRepository(username, repoName, repoPath);
         }
       }
     );

@@ -2,6 +2,7 @@ import simpleGit from 'simple-git';
 import * as fs from 'fs-extra';
 import * as os from 'os';
 import * as path from 'path';
+import { materializeRepositoryReference } from '../services/repositoryStorage';
 
 export interface PRDiffResult {
   files: { filename: string; additions: number; deletions: number; content?: string }[];
@@ -23,6 +24,8 @@ export const computeDiffBetweenRepos = async (
 
   try {
     await fs.ensureDir(tmpDir);
+    upstreamBarePath = await materializeRepositoryReference(upstreamBarePath);
+    forkBarePath = await materializeRepositoryReference(forkBarePath);
 
     const git = simpleGit();
 
@@ -135,6 +138,8 @@ export const computeDiffWithContents = async (
 
   try {
     await fs.ensureDir(tmpDir);
+    upstreamBarePath = await materializeRepositoryReference(upstreamBarePath);
+    forkBarePath = await materializeRepositoryReference(forkBarePath);
 
     const git = simpleGit();
 

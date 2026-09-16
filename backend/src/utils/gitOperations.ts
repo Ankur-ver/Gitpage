@@ -6,6 +6,7 @@ import {
   GitOperationResult,
   InitRepositoryOptions,
 } from "../types";
+import { materializeRepositoryReference, persistNamedRepository } from "../services/repositoryStorage";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Create a bare repository
@@ -267,9 +268,12 @@ export const mergeBranches = async (
   headBranch: string
 ): Promise<GitOperationResult> => {
   const tempDir = path.join(os.tmpdir(), `gitpage-merge-${Date.now()}`);
+  const upstreamReference = upstreamRepoPath;
 
   try {
     await fs.ensureDir(tempDir);
+    upstreamRepoPath = await materializeRepositoryReference(upstreamRepoPath);
+    forkRepoPath = await materializeRepositoryReference(forkRepoPath);
 
     // Clone upstream repository
     const git = simpleGit();
@@ -341,6 +345,10 @@ await repoGit.merge([forkCommit]);
     // Push merged result
     try {
       await repoGit.push("origin", baseBranch);
+      if (upstreamReference.startsWith("repositories/")) {
+        const [, owner, repoFile] = upstreamReference.split('/');
+        await persistNamedRepository(owner, repoFile.replace('.git.tar.gz', ''), upstreamRepoPath);
+      }
     } catch (err: any) {
       console.error("GIT PUSH ERROR:", err);
 

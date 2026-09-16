@@ -15,11 +15,11 @@ router.get('/dashboard', protect, async (req: AuthRequest, res: Response) => {
 
     const repos = await Repository.find({ owner: userId }).select('name').lean();
 
-    const commitCounts = repos.map(repo =>
-      gitService.repoExists(req.user.username, repo.name)
-        ? gitService.getCommitCount(req.user.username, repo.name)
+    const commitCounts = await Promise.all(repos.map(async repo =>
+      await gitService.repoExists(req.user.username, repo.name)
+        ? await gitService.getCommitCount(req.user.username, repo.name)
         : 0
-    );
+    ));
 
     const [mergedPrs, closedIssues, reviewComments] = await Promise.all([
       PullRequest.countDocuments({ author: userId, state: 'merged' }),

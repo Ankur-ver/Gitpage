@@ -6,18 +6,20 @@ import simpleGit  from 'simple-git';
 import mongoose   from 'mongoose';
 import Repository from '../models/Repository';
 import { protect, AuthRequest } from '../middleware/auth';
+import {
+  persistNamedRepository,
+  prepareRepository,
+  repositoryObjectKey,
+  repositoryStoragePath,
+} from '../services/repositoryStorage';
 
 const router = Router();
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────
-const getGit = (username: string, repoName: string) => {
-  const repoPath = path.join(
-    process.env.REPOS_DIR as string,
-    username,
-    `${repoName}.git`
-  );
+const getGit = async (username: string, repoName: string) => {
+  const repoPath = await prepareRepository(username, repoName);
   return { git: simpleGit(repoPath), repoPath };
 };
 
@@ -59,7 +61,7 @@ router.get(
       });
       if (!repo) return res.status(404).json({ success: false, error: 'Not found' });
 
-      const { git } = getGit(username, repoName);
+      const { git } = await getGit(username, repoName);
       const summary  = await git.branch(['-a']);
 
       const branches = Object.entries(summary.branches)
@@ -92,7 +94,7 @@ router.get(
       const branch  = (req.query.branch as string) || 'main';
       const dirPath = (req.query.path   as string) || '';
 
-      const { git } = getGit(username, repoName);
+      const { git } = await getGit(username, repoName);
 
       const treeTarget = dirPath ? `${branch}:${dirPath}` : branch;
       const rawTree    = await git.raw(['ls-tree', treeTarget]);
@@ -169,7 +171,7 @@ router.get(
         return res.status(400).json({ success: false, error: 'File path required' });
       }
 
-      const { git } = getGit(username, repoName);
+      const { git } = await getGit(username, repoName);
       const content  = await git.show([`${branch}:${filePath}`]);
       const sha      = (await git.raw(['rev-parse', `${branch}:${filePath}`])).trim();
 
@@ -238,7 +240,7 @@ router.put(
         return res.status(403).json({ success: false, error: 'You do not have write access to this repository' });
       }
 
-      const { git, repoPath } = getGit(username, repoName);
+      const { git, repoPath } = await getGit(username, repoName);
       const targetBranch = branch || repo.defaultBranch || 'main';
 
       await git.raw(['rev-parse', '--verify', targetBranch]);
@@ -273,6 +275,7 @@ router.put(
 
       const commit = await workGit.commit(commitMessage, [filePath]);
       await workGit.push('origin', targetBranch);
+      await persistNamedRepository(username, repoName, repoPath);
 
       repo.updatedAt = new Date();
       await repo.save();
@@ -316,7 +319,7 @@ router.get(
       const limit  = Math.max(1, parseInt(req.query.limit as string) || 20);
       const skip   = (page - 1) * limit;
 
-      const { git } = getGit(username, repoName);
+      const { git } = await getGit(username, repoName);
 
       /* ── 1. Verify branch exists ── */
       let resolvedBranch = branch;
@@ -476,7 +479,7 @@ router.get(
       });
       if (!repo) return res.status(404).json({ success: false, error: 'Not found' });
 
-      const { git } = getGit(username, repoName);
+      const { git } = await getGit(username, repoName);
 
       let totalCommits = 0;
       try {
@@ -706,16 +709,12 @@ router.post(
 
       const forkerUsername: string = forkingUser.username;
 
-      const repoBasePath = process.env.REPO_STORAGE_PATH || process.env.REPOS_DIR;
-      if (!repoBasePath) {
-        return res.status(500).json({ message: 'Repository storage path is not configured' });
-      }
-
-      const repoPath = path.resolve(repoBasePath, forkerUsername, `${forkName}.git`);
+      const repoPath = repositoryStoragePath(forkerUsername, forkName);
       await fs.mkdir(path.dirname(repoPath), { recursive: true });
 
-      const sourceRepoPath = getGit(source.ownerUsername, source.name).repoPath;
+      const sourceRepoPath = (await getGit(source.ownerUsername, source.name)).repoPath;
       await simpleGit().clone(sourceRepoPath, repoPath, ['--bare']);
+      await persistNamedRepository(forkerUsername, forkName, repoPath);
 
       const forked = await Repository.create({
         name:          forkName,
@@ -742,7 +741,7 @@ router.post(
         openIssues:    0,
         license:       source.license,
         homepage:      source.homepage,
-        gitPath:       repoPath,
+        gitPath:       repositoryObjectKey(forkerUsername, forkName),
         cloneUrls: {
           http: `${process.env.APP_URL ?? 'http://localhost:5000'}/${forkerUsername}/${forkName}.git`,
           ssh:  `git@${process.env.APP_DOMAIN ?? 'localhost'}:${forkerUsername}/${forkName}.git`,
