@@ -165,7 +165,7 @@ export const initializeRepositoryWithFiles = async (
   ownerUsername: string,
   options: InitRepositoryOptions
 ): Promise<GitOperationResult> => {
-  const { initializeWithReadme, gitignoreTemplate, licenseTemplate, description } = options;
+  const { initializeWithReadme, gitignoreTemplate, licenseTemplate, description, remoteUrl } = options;
 
   const tempDir = path.join(os.tmpdir(), `gitpage-init-${Date.now()}`);
 
@@ -183,9 +183,15 @@ export const initializeRepositoryWithFiles = async (
 
     // Add README.md
     if (initializeWithReadme) {
-      const readmeContent = `# ${repoName}\n\n${
-        description ?? "A new repository created on GitPage"
-      }\n`;
+      const readmeContent = `# ${repoName}\n\n${description ?? "A new repository created on GitPage"}\n\n` +
+        `## Commit and push\n\n` +
+        `Add this repository as the remote for your local project, then commit and push your code:\n\n` +
+        `\`\`\`bash\n` +
+        `git remote add origin ${remoteUrl ?? "<repository-url>"}\n` +
+        `git add .\n` +
+        `git commit -m "Initial commit"\n` +
+        `git push -u origin main\n` +
+        `\`\`\`\n`;
       await fs.writeFile(path.join(tempDir, "README.md"), readmeContent);
       filesToAdd.push("README.md");
     }

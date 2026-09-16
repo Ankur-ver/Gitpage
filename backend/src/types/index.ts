@@ -114,6 +114,7 @@ export interface InitRepositoryOptions {
   gitignoreTemplate: string;
   licenseTemplate: string;
   description?: string;
+  remoteUrl?: string;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

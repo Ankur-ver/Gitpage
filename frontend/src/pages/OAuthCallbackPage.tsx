@@ -41,9 +41,9 @@ const OAuthCallbackPage: React.FC = () => {
     // ── complete sign-in ──────────────────────────────────────────────────────
     console.log("tokenP:",token)
     loginWithToken(token)
-      .then(() => {
+      .then((user) => {
         toast.success(`Signed in with ${provider}! 🎉`);
-        navigate('/dashboard', { replace: true });
+        navigate(`/profile/${user.username}`, { replace: true });
       })
       .catch((err) => {
         console.error('OAuthCallback error:', err);

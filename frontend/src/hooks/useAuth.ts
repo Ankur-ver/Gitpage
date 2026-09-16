@@ -13,7 +13,7 @@ export const useAuth = () => {
     const result = await dispatch(login({ email, password }));
     if (login.fulfilled.match(result)) {
       toast.success('Welcome back!');
-      navigate('/dashboard');
+      navigate(`/profile/${result.payload.user.username}`);
     } else {
       toast.error(result.payload as string);
     }
@@ -23,7 +23,7 @@ export const useAuth = () => {
     const result = await dispatch(register({ username, email, password }));
     if (register.fulfilled.match(result)) {
       toast.success('Account created successfully!');
-      navigate('/dashboard');
+      navigate(`/profile/${result.payload.user.username}`);
     } else {
       toast.error(result.payload as string);
     }

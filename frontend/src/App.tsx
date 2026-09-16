@@ -47,8 +47,6 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
 };
 
 const App: React.FC = () => {
-  const isAuthenticated = useSelector((s: RootState) => s.auth.isAuthenticated);
-
   return (
     <div className="min-h-screen bg-bg-primary">
       <Navbar />
@@ -57,8 +55,8 @@ const App: React.FC = () => {
           <Route path="/" element={ <LandingPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
-          {/* <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} /> */}
-          <Route path="profile/:username" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+          <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+          <Route path="/profile/:username" element={<ProfilePage />} />
           <Route path="/repositories" element = {<ProtectedRoute><MyRepositoriesPage /></ProtectedRoute>}/>
           <Route path="/:username/:repo" element={<RepositoryPage />} />
           <Route path="/:username/:repo/issues" element={<IssuesPage />} />

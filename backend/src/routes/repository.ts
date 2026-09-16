@@ -744,7 +744,7 @@ router.post(
         gitPath:       repositoryObjectKey(forkerUsername, forkName),
         cloneUrls: {
           http: `${process.env.APP_URL ?? 'http://localhost:5000'}/${forkerUsername}/${forkName}.git`,
-          ssh:  `git@${process.env.APP_DOMAIN ?? 'localhost'}:${forkerUsername}/${forkName}.git`,
+          ssh:  `git@${process.env.APP_DOMAIN ?? 'gitpage.com'}:${forkerUsername}/${forkName}.git`,
         },
         isInitialized: true,
         initOptions:   source.initOptions,

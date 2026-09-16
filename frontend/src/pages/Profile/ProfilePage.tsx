@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useParams, Link } from 'react-router-dom';
 import {
@@ -8,6 +8,7 @@ import {
 } from '@heroicons/react/24/outline';
 import ContributionGraph from '../../components/Dashboard/ContributionGraph';
 import { getLanguageColor, formatNumber } from '../../utils/helpers';
+import api from '../../services/api';
 
 type Tab = 'overview'|'repositories'|'projects'|'packages'|'stars';
 
@@ -20,13 +21,31 @@ const REPOS = [
   { name:'devutils',         lang:'Rust',       stars:123, forks:14, desc:'High-performance dev utilities',               updated:'2w ago',  private:false },
 ];
 
-const PINNED = REPOS.slice(0, 4);
-
 const ProfilePage: React.FC = () => {
   const { username } = useParams<{ username:string }>();
   const [tab, setTab]         = useState<Tab>('overview');
   const [following, setFollowing] = useState(false);
   const [contributionCount, setContributionCount] = useState<number | null>(null);
+  const [profile, setProfile] = useState<any>(null);
+  const [repos, setRepos] = useState(REPOS);
+
+  useEffect(() => {
+    if (!username) return;
+    api.get(`/repos/user/${username}`).then(({ data }) => {
+      setProfile(data.data.user);
+      setRepos((data.data.repositories ?? []).map((repo: any) => ({
+        name: repo.name,
+        lang: repo.language || 'Unknown',
+        stars: repo.stars?.length ?? 0,
+        forks: repo.forks?.length ?? 0,
+        desc: repo.description || 'No description provided.',
+        updated: new Date(repo.updatedAt).toLocaleDateString(),
+        private: false,
+      })));
+    }).catch(() => setRepos([]));
+  }, [username]);
+
+  const pinned = repos.slice(0, 4);
 
   return (
     <div className="min-h-screen bg-bg-primary pt-14">
@@ -46,7 +65,7 @@ const ProfilePage: React.FC = () => {
                               shadow-glow ring-4 ring-[#2a2a3a] mb-4">
                 {username?.slice(0,2).toUpperCase()}
               </div>
-              <h1 className="text-2xl font-black text-text-primary">{username}</h1>
+              <h1 className="text-2xl font-black text-text-primary">{profile?.displayName || username}</h1>
               <p className="text-text-muted text-sm">@{username}</p>
               <div className="flex items-center gap-2 mt-2">
                 <span className="badge badge-success">Pro</span>
@@ -56,8 +75,7 @@ const ProfilePage: React.FC = () => {
 
             {/* Bio */}
             <p className="text-text-secondary text-sm leading-relaxed">
-              Full-stack developer passionate about open source, AI, and building tools
-              that developers love. ✨
+              {profile?.bio || 'No bio yet.'}
             </p>
 
             {/* Follow button */}
@@ -162,7 +180,7 @@ const ProfilePage: React.FC = () => {
                 >
                   {t}
                   {t === 'repositories' && (
-                    <span className="ml-1.5 badge badge-primary">{REPOS.length}</span>
+                    <span className="ml-1.5 badge badge-primary">{repos.length}</span>
                   )}
                 </button>
               ))}
@@ -192,7 +210,7 @@ const ProfilePage: React.FC = () => {
                     <button className="text-xs text-indigo-400 hover:text-indigo-300">Customize</button>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {PINNED.map((repo, i) => (
+                    {pinned.map((repo, i) => (
                       <motion.div
                         key={repo.name}
                         initial={{ opacity:0, y:10 }}

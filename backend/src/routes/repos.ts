@@ -184,8 +184,8 @@ router.post(
         },
         gitPath: repoKey,
         cloneUrls: {
-          http: `http://localhost:${process.env.PORT}/${owner.username}/${name}.git`,
-          ssh: `git@gitpage.com:${owner.username}/${name}.git`,
+          http: `${process.env.APP_URL || `http://localhost:${process.env.PORT}`}/${owner.username}/${name}.git`,
+          ssh: `git@${process.env.APP_DOMAIN || "gitpage.com"}:${owner.username}/${name}.git`,
         },
       });
       console.log(repository);
@@ -217,6 +217,7 @@ router.post(
             gitignoreTemplate: gitignoreTemplate ?? "",
             licenseTemplate: licenseTemplate ?? "",
             description: description ? description.trim() : "",
+            remoteUrl: repository.cloneUrls.http,
           }
         );
       }
@@ -402,6 +403,33 @@ router.get(
     }
   }
 );
+
+// ─────────────────────────────────────────────────────────────────────────────
+// @route   GET /api/repos/user/:username
+// @desc    Get a public user profile and its public repositories
+// @access  Public
+// ─────────────────────────────────────────────────────────────────────────────
+router.get("/user/:username", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const username = req.params.username;
+    const escaped = username.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const user = await User.findOne({ username: { $regex: `^${escaped}$`, $options: "i" } })
+      .select("username displayName avatarUrl bio location website company followers following createdAt")
+      .lean();
+    if (!user) {
+      res.status(404).json({ success: false, error: "User not found" });
+      return;
+    }
+    const repositories = await Repository.find({ owner: user._id, visibility: "public", status: "ready" })
+      .select("name description language stars forks updatedAt defaultBranch")
+      .sort({ updatedAt: -1 })
+      .lean();
+    res.json({ success: true, data: { user, repositories } });
+  } catch (err) {
+    console.error("Get public profile error:", (err as Error).message);
+    res.status(500).json({ success: false, error: "Failed to fetch profile" });
+  }
+});
 
 // ─────────────────────────────────────────────────────────────────────────────
 // @route   GET /api/repositories/:username/:repoName

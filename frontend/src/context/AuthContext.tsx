@@ -11,7 +11,7 @@ import { User }        from '../types';
 
 interface AuthContextValue {
   loading        : boolean;
-  loginWithToken : (token: string) => Promise<void>;
+  loginWithToken : (token: string) => Promise<User>;
   logout         : () => void;
 }
 
@@ -27,7 +27,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // ── loginWithToken ─────────────────────────────────────────────────────────
   // Called by OAuthCallbackPage after receiving ?token= from backend
-const loginWithToken = useCallback(async (token: string): Promise<void> => {
+const loginWithToken = useCallback(async (token: string): Promise<User> => {
   setLoading(true);
 
   // ── 1. Persist token BEFORE the API call ─────────────────────────────────
@@ -46,6 +46,7 @@ const loginWithToken = useCallback(async (token: string): Promise<void> => {
     localStorage.setItem('user',     JSON.stringify(user));
     localStorage.setItem('userId',   user.id);
     localStorage.setItem('username', user.username);
+    return user;
 
   } catch (err: any) {
     // ── clean up everything on failure ────────────────────────────────────────
