@@ -58,7 +58,7 @@ console.log(
 // ── Models ───────────────────────────────────────────────────────
 const DEFAULT_MODELS: Record<AIProvider, string> = {
   gemini: 'gemini-1.5-flash',
-  groq:   'llama-3.3-70b-versatile',
+  groq:   'openai/gpt-oss-120b',
   openai: 'gpt-4o-mini',
   none:   '',
 };
