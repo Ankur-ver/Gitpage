@@ -4,6 +4,7 @@
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only server.ts",
     "build": "tsc",
+    "migrate:readmes": "ts-node src/scripts/migrateRepositoryReadmes.ts",
     "start": "node dist/server.js"
   },
   "dependencies": {

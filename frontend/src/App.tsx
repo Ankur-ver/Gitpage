@@ -9,7 +9,6 @@ import MyRepositoriesPage from './pages/MyRepositoriesPage/MyRepositoriesPage';
 
 const LandingPage    = lazy(() => import('./pages/Landing/LandingPage'));
 const Dashboard      = lazy(() => import('./pages/Dashboard/Dashboard'));
-const ProfilePage    = lazy(() => import('./pages/Profile/ProfilePage'));
 const RepositoryPage = lazy(() => import('./pages/Repository/RepositoryPage'));
 const IssuesPage     = lazy(() => import('./pages/Repository/IssuesPage'));
 const PullRequestsPage = lazy(() => import('./pages/Repository/PullRequestsPage'));
@@ -56,7 +55,7 @@ const App: React.FC = () => {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-          <Route path="/profile/:username" element={<ProfilePage />} />
+          <Route path="/profile/:username" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
           <Route path="/repositories" element = {<ProtectedRoute><MyRepositoriesPage /></ProtectedRoute>}/>
           <Route path="/:username/:repo" element={<RepositoryPage />} />
           <Route path="/:username/:repo/issues" element={<IssuesPage />} />
