@@ -713,8 +713,8 @@ const { fork: forkRepo, loading: forkLoading, error: forkError, forkCount } =
                   )}
                   <h2 className="text-lg font-bold text-text-primary mb-2">Getting Started</h2>
                   <pre className="bg-[#0d0d14] border border-[#2a2a3a] rounded-lg p-4 text-sm font-mono text-green-400 overflow-x-auto">
-{`# Clone the repository
-git clone ${repo.cloneUrls.http}
+{`# Map this repository
+git add origin main ${repo.cloneUrls.http}
 
 # Install dependencies
 npm install

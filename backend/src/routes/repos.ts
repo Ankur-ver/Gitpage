@@ -30,6 +30,9 @@ import {
 
 const router = Router();
 
+const getBackendBaseUrl = (req: Request): string =>
+  (process.env.APP_URL || `${req.protocol}://${req.get("host")}`).replace(/\/+$/, "");
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Reserved repository names
 // ─────────────────────────────────────────────────────────────────────────────
@@ -184,7 +187,7 @@ router.post(
         },
         gitPath: repoKey,
         cloneUrls: {
-          http: `${process.env.APP_URL || `http://localhost:${process.env.PORT}`}/${owner.username}/${name}.git`,
+          http: `${getBackendBaseUrl(req)}/${owner.username}/${name}.git`,
           ssh: `git@${process.env.APP_DOMAIN || "gitpage.com"}:${owner.username}/${name}.git`,
         },
       });
@@ -462,6 +465,10 @@ router.get(
         });
         return;
       }
+
+      // Older records may contain localhost URLs. Always expose the current
+      // backend URL so the Code dropdown remains correct after deployment.
+      repository.cloneUrls.http = `${getBackendBaseUrl(req)}/${repository.ownerUsername}/${repository.name}.git`;
 
       // ── Check private repo access ───────────────────────────────────────────
       if (repository.visibility === "private") {
