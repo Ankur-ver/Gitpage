@@ -407,6 +407,7 @@ const PullRequestsPage: React.FC = () => {
         onClose={() => setShowAIReview(false)}
         title="AI Code Review"
         size="xl"
+        contentClassName="max-h-[calc(90vh-4.5rem)] overflow-y-auto"
       >
         <AICodeReview />
       </Modal>

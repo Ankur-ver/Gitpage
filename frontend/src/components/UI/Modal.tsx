@@ -8,11 +8,19 @@ interface Props {
   title?: string;
   children: React.ReactNode;
   size?: 'sm' | 'md' | 'lg' | 'xl';
+  contentClassName?: string;
 }
 
 const sizeMap = { sm: 'max-w-sm', md: 'max-w-md', lg: 'max-w-lg', xl: 'max-w-2xl' };
 
-const Modal: React.FC<Props> = ({ open, onClose, title, children, size = 'md' }) => {
+const Modal: React.FC<Props> = ({
+  open,
+  onClose,
+  title,
+  children,
+  size = 'md',
+  contentClassName = '',
+}) => {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     window.addEventListener('keydown', handler);
@@ -35,7 +43,7 @@ const Modal: React.FC<Props> = ({ open, onClose, title, children, size = 'md' })
             animate={{ scale: 1,    y: 0,  opacity: 1 }}
             exit  ={{ scale: 0.95, y: 20, opacity: 0 }}
             onClick={e => e.stopPropagation()}
-            className={`w-full ${sizeMap[size]} bg-bg-card border border-[#2a2a3a]
+            className={`w-full ${sizeMap[size]} max-h-[90vh] bg-bg-card border border-[#2a2a3a]
                         rounded-2xl shadow-glow-lg overflow-hidden`}
           >
             {title && (
@@ -47,7 +55,7 @@ const Modal: React.FC<Props> = ({ open, onClose, title, children, size = 'md' })
                 </button>
               </div>
             )}
-            <div className="p-5">{children}</div>
+            <div className={`p-5 ${contentClassName}`}>{children}</div>
           </motion.div>
         </motion.div>
       )}
