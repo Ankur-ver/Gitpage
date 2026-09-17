@@ -69,6 +69,28 @@ const gitService = {
     }
   },
 
+  /* ── Commits in a date window ─────────────────────────────── */
+  async getCommitsSince(owner: string, repoName: string, since: Date) {
+    const repoPath = await prepareRepository(owner, repoName);
+    try {
+      const format = '--pretty=format:%an|%ae|%aI';
+      const output = execSync(
+        `git log --all --since=${JSON.stringify(since.toISOString())} ${format}`,
+        { cwd: repoPath }
+      ).toString();
+
+      return output
+        .split('\n')
+        .filter(Boolean)
+        .map(line => {
+          const [authorName, authorEmail, date] = line.split('|');
+          return { authorName, authorEmail, date };
+        });
+    } catch {
+      return [];
+    }
+  },
+
   /* ── Repo exists? ──────────────────────────────────────────── */
   async repoExists(owner: string, repoName: string): Promise<boolean> {
     try {

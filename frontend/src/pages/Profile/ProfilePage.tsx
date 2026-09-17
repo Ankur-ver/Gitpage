@@ -197,7 +197,7 @@ const ProfilePage: React.FC = () => {
                 <div className="gradient-border p-5">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="font-semibold text-text-primary">
-                      <span className="text-indigo-400">{contributionCount ?? 847}</span> contributions in 2024
+                      <span className="text-indigo-400">{contributionCount ?? 0}</span> contributions in the last year
                     </h3>
                   </div>
                   <ContributionGraph username={username} onTotalChange={setContributionCount} />
