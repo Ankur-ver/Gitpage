@@ -607,15 +607,12 @@ export const repositoryService = {
     repoName: string
   ): Promise<ForkActionResult> {
     try {
-      const { data } = await api.post<ApiResponse<{
-        repository: RawRepository;
-        forkCount : number;
-      }>>(
+      const { data } = await api.post<RawRepository>(
         `/repositories/${username}/${repoName}/fork`
       );
       return {
-        repository: normalizeRepository(data.data.repository),
-        forkCount : data.data.forkCount,
+        repository: normalizeRepository(data),
+        forkCount : data.forks?.length ?? 0,
       };
     } catch (err) {
       throw new Error(extractError(err));

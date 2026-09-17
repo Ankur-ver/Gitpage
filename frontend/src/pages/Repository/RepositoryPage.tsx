@@ -477,7 +477,7 @@ const RepositoryPage: React.FC = () => {
   );
 
   /* ── resolve initial star / watch state from repo data ── */
-  const currentUserId = localStorage.getItem('userId') ?? '';
+  const currentUsername = localStorage.getItem('username') ?? '';
 
 // AFTER - derive from server data when available, fall back to localStorage
 // ============================================================
@@ -521,8 +521,8 @@ const { fork: forkRepo, loading: forkLoading, error: forkError, forkCount } =
   /* ── handlers ── */
   const handleFork = useCallback(async () => {
     const forked = await forkRepo();
-    if (forked) navigate(`/${currentUserId}/${forked.name}`);
-  }, [forkRepo, navigate, currentUserId]);
+    if (forked && currentUsername) navigate(`/${currentUsername}/${forked.name}`);
+  }, [forkRepo, navigate, currentUsername]);
 
   const handleBranchChange = useCallback((newBranch: string) => {
     setBranch(newBranch);

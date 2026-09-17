@@ -23,6 +23,33 @@ interface Props {
   diff?: string;
 }
 
+const normalizeReview = (review: any): ReviewResult => {
+  const comments: ReviewComment[] = [
+    ...(Array.isArray(review?.comments) ? review.comments : []),
+    ...(Array.isArray(review?.issues) ? review.issues.map((issue: any) => ({
+      line: Number(issue.line) || 0,
+      type: 'issue' as const,
+      comment: issue.comment || issue.message || String(issue),
+      suggestion: issue.suggestion,
+    })) : []),
+    ...(Array.isArray(review?.suggestions) ? review.suggestions.map((suggestion: any) => ({
+      line: Number(suggestion.line) || 0,
+      type: 'suggestion' as const,
+      comment: suggestion.comment || suggestion.message || String(suggestion),
+      suggestion: suggestion.suggestion,
+    })) : []),
+  ];
+
+  return {
+    score: Number(review?.score) || 0,
+    summary: review?.summary || 'The review did not return a summary.',
+    approved: typeof review?.approved === 'boolean'
+      ? review.approved
+      : (Number(review?.score) || 0) >= 70,
+    comments,
+  };
+};
+
 const AICodeReview: React.FC<Props> = ({ prId = '', diff = '' }) => {
   const [reviewing, setReviewing] = useState(false);
   const [result, setResult]       = useState<ReviewResult | null>(null);
@@ -33,7 +60,7 @@ const AICodeReview: React.FC<Props> = ({ prId = '', diff = '' }) => {
     setReviewing(true);
     try {
       const res = await aiService.reviewPR(prId, customDiff);
-      setResult(res);
+      setResult(normalizeReview(res));
     } catch {
       // Demo result when API not available
       setResult({
